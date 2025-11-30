@@ -29,10 +29,12 @@ class MasterGame:
         self.root.title("MasterGame — Tetris + Snake (Gráfico)")
         self.root.protocol("WM_DELETE_WINDOW", self._on_quit)
 
-        # ventana tamaño
-        self.WIN_W = width
-        self.WIN_H = height
-        self.root.geometry(f"{self.WIN_W}x{self.WIN_H}")
+        # Maximizar ventana (Windows + Linux)
+        self.root.state("zoomed")
+        try:
+            self.root.attributes("-zoomed", True)
+        except:
+            pass
 
         # sonido opcional
         self.snd_tetris = None
@@ -51,15 +53,35 @@ class MasterGame:
         self.mode = None  # "tetris" or "snake" or None
         self.running = False
 
-        # --- Layout: left control panel, right canvas area ---
+        # ---------------------------
+        # LAYOUT RESPONSIVE (GRID)
+        # ---------------------------
+        self.root.rowconfigure(0, weight=1)
+        self.root.columnconfigure(0, weight=0)
+        self.root.columnconfigure(1, weight=1)
+
+        # panel izquierdo
         self.left_w = 200
         self.left_frame = tk.Frame(self.root, width=self.left_w)
-        self.left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=6, pady=6)
+        self.left_frame.grid(row=0, column=0, sticky="ns", padx=6, pady=6)
 
+        # área del canvas
         self.canvas_frame = tk.Frame(self.root)
-        self.canvas_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=6, pady=6)
+        self.canvas_frame.grid(row=0, column=1, sticky="nsew", padx=6, pady=6)
 
-        # Controls
+        self.canvas_frame.rowconfigure(0, weight=1)
+        self.canvas_frame.columnconfigure(0, weight=1)
+
+        # canvas
+        self.canvas = tk.Canvas(self.canvas_frame, bg="black")
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+
+        # redibujar al cambiar tamaño (responsive)
+        self.canvas.bind("<Configure>", self._on_resize)
+
+        # ---------------------------
+        # Controles interiores (pack)
+        # ---------------------------
         tk.Label(self.left_frame, text="MasterGame", font=("Arial", 16, "bold")).pack(pady=(6,12))
         tk.Button(self.left_frame, text="Jugar Tetris", width=18, command=self.start_tetris).pack(pady=4)
         tk.Button(self.left_frame, text="Jugar Snake", width=18, command=self.start_snake).pack(pady=4)
@@ -70,32 +92,27 @@ class MasterGame:
         self.info_label = tk.Label(self.left_frame, text="", justify=tk.LEFT, wraplength=self.left_w-10)
         self.info_label.pack()
 
-        # Canvas
-        self.canvas = tk.Canvas(self.canvas_frame, bg="black")
-        self.canvas.pack(fill=tk.BOTH, expand=True)
-
         # bind keys
         self.root.bind_all("<Key>", self._on_key)
 
         # clock
         self._after_id = None
 
-        # Tetris & Snake configuration placeholders (set when starting)
-        # --- TETRIS parameters (grid cells) ---
+        # parámetros Tetris
         self.t_width = 10
         self.t_height = 20
-        self.cell = 24  # px per cell
-        # margin to center the tetris board
+        self.cell = 24
         self.t_margin_x = 20
         self.t_margin_y = 20
 
-        # --- SNAKE parameters ---
+        # parámetros Snake
         self.s_cols = 30
         self.s_rows = 20
         self.s_cell = 20
 
-        # initialize drawing
+        # mostrar menú inicial
         self._show_menu_info()
+
 
         # Start mainloop if used as script; else call start()
     # end __init__
@@ -114,6 +131,37 @@ class MasterGame:
         w = self.canvas.winfo_width() or self.WIN_W - self.left_w - 20
         h = self.canvas.winfo_height() or self.WIN_H - 20
         self.canvas.create_text(w//2, h//2, text="MasterGame\nTetris & Snake", fill="white", font=("Arial", 30), justify="center")
+
+    def _on_resize(self, event):
+        """Se ejecuta cada vez que el canvas cambia de tamaño."""
+        
+        # Redibujar menú
+        if self.mode is None:
+            self._show_menu_info()
+            return
+
+        # Reposicionar Tetris
+        if self.mode == "tetris":
+            new_w = event.width
+            new_h = event.height
+
+            # recalcular márgenes para centrar el tablero
+            self.t_margin_x = (new_w - (self.t_width * self.cell)) // 2
+            self.t_margin_y = (new_h - (self.t_height * self.cell)) // 2
+
+            self._draw_tetris()
+            return
+
+        # Reposicionar Snake
+        if self.mode == "snake":
+            new_w = event.width
+            new_h = event.height
+
+            self.s_margin_x = (new_w - (self.s_cols * self.s_cell)) // 2
+            self.s_margin_y = (new_h - (self.s_rows * self.s_cell)) // 2
+
+            self._draw_snake()
+            return
 
     def _on_quit(self):
         self.stop_game()
@@ -154,6 +202,7 @@ class MasterGame:
                     pass
                 self._after_id = None
             self.mode = None
+            self.canvas.delete("all")
             self._show_menu_info()
     # =========================
     #  TETRIS implementation
@@ -257,33 +306,67 @@ class MasterGame:
 
     def _draw_tetris(self):
         self.canvas.delete("all")
-        # draw board background
-        bw = self.t_width*self.cell
-        bh = self.t_height*self.cell
+        bw = self.t_width * self.cell
+        bh = self.t_height * self.cell
         x0 = self.t_margin_x
         y0 = self.t_margin_y
-        # background rect
-        self.canvas.create_rectangle(x0-2,y0-2,x0+bw+2,y0+bh+2,fill="#111",outline="#333")
-        # draw locked blocks
+
+        # fondo del tablero
+        self.canvas.create_rectangle(x0-2, y0-2, x0+bw+2, y0+bh+2,
+                                    fill="#111", outline="#333")
+
+        # bloques fijos
         for y in range(self.t_height):
             for x in range(self.t_width):
                 cell = self.t_board[y][x]
                 if cell:
                     self._draw_cell(x0 + x*self.cell, y0 + y*self.cell, self.cell, cell)
-        # draw active piece
+
+        # pieza activa
         for py, row in enumerate(self.t_piece):
             for px, val in enumerate(row):
                 if val:
                     cx = x0 + (self.t_piece_x+px)*self.cell
                     cy = y0 + (self.t_piece_y+py)*self.cell
                     self._draw_cell(cx, cy, self.cell, self.t_piece_color)
-        # grid lines (subtle)
+
+        # líneas de cuadrícula
         for i in range(self.t_width+1):
             self.canvas.create_line(x0+i*self.cell, y0, x0+i*self.cell, y0+bh, fill="#222")
         for j in range(self.t_height+1):
             self.canvas.create_line(x0, y0+j*self.cell, x0+bw, y0+j*self.cell, fill="#222")
-        # score
-        self.canvas.create_text(x0 + bw + 80, y0 + 20, text=f"Puntaje: {self.t_score}", fill="white", font=("Arial",12), anchor="w")
+
+        # puntaje a la derecha
+        self.canvas.create_text(
+            x0 + bw + 80, y0 + 20,
+            text=f"Puntaje: {self.t_score}",
+            fill="white",
+            font=("Arial", 12),
+            anchor="w"
+        )
+
+        # ============================
+        # BARRA DE COMANDOS INFERIOR
+        # ============================
+        bar_text = (
+            "1=Izq | 2=Abajo | 3=Der | 4=Pausa | "
+            "5=Drop | 6=Power | 7=Rotar | 0=Salir"
+        )
+        # --- NUEVO: usar el alto REAL DEL CANVAS ---
+        cW = self.canvas.winfo_width()
+        cH = self.canvas.winfo_height()
+
+        self.canvas.create_rectangle(
+            0, cH - 35, cW, cH,
+            fill="#222", outline="#444"
+        )
+        self.canvas.create_text(
+            cW // 2, cH - 18,
+            text=bar_text,
+            fill="white",
+            font=("Arial", 11)
+        )
+
 
     def _draw_cell(self, x, y, s, color_name):
         # map color names to hex
@@ -344,11 +427,26 @@ class MasterGame:
         elif key=="3":
             if not self._tetris_collides(self.t_piece_x+1, self.t_piece_y, self.t_piece):
                 self.t_piece_x += 1
-        elif key=="4":
-            # rest/pause for 7 seconds
+        elif key == "4":
+            if not self.running:
+                return  # evita bug si ya está pausado
+
             self.running = False
-            self.canvas.after_cancel(self._after_id) if self._after_id else None
+            if self._after_id:
+                try:
+                    self.canvas.after_cancel(self._after_id)
+                except:
+                    pass
+
+            # texto de pausa
+            self.canvas.create_text(
+                self.WIN_W//2, 35,
+                text="PAUSA (7 seg)",
+                fill="yellow",
+                font=("Arial", 20)
+            )
             self.canvas.update()
+
             self.canvas.after(7000, self._resume_after_pause)
             return
         elif key=="5":
@@ -356,21 +454,35 @@ class MasterGame:
             while not self._tetris_collides(self.t_piece_x, self.t_piece_y+1, self.t_piece):
                 self.t_piece_y += 1
             self._tetris_lock_piece()
-        elif key=="6":
-            # power: clear board if score>=1000 and not used
-            if self.t_score>=1000 and not self.t_power_used:
+        elif key == "6":
+            # POWER: limpiar tablero si puntaje >= 1000 y no usado
+            if self.t_score >= 1000 and not self.t_power_used:
                 for y in range(self.t_height):
                     for x in range(self.t_width):
-                        self.t_board[y][x]=0
+                        self.t_board[y][x] = 0
                 self.t_power_used = True
             else:
-                # small feedback: flash
-                pass
-        elif key=="7":
-            # rotate (try)
+                # retroalimentación: parpadeo rápido del fondo
+                self.canvas.create_rectangle(
+                    0, 0, self.WIN_W, self.WIN_H,
+                    fill="#550000"
+                )
+                self.canvas.update()
+                self.canvas.after(60)
+        elif key == "7":
+            # Rotación con validación de bordes
             newp = self._rotate_matrix(self.t_piece)
+
+            # Si choca, intenta corregir moviendo 1 a la izquierda o derecha
             if not self._tetris_collides(self.t_piece_x, self.t_piece_y, newp):
                 self.t_piece = newp
+            elif not self._tetris_collides(self.t_piece_x - 1, self.t_piece_y, newp):
+                self.t_piece_x -= 1
+                self.t_piece = newp
+            elif not self._tetris_collides(self.t_piece_x + 1, self.t_piece_y, newp):
+                self.t_piece_x += 1
+                self.t_piece = newp
+            # Si no se pudo corregir → no se rota (validación)
         # play sound per key
         try:
             if self.snd_tetris:
