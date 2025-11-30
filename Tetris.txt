@@ -1,0 +1,152 @@
+# Archivo de configuración para el juego de Tetris
+# Desarrollado por Ivan Andres Gomez y Jesus Casadiegos 
+
+# ==================================
+# PARAMETROS GENERALES DEL JUEGO
+# ==================================
+
+nombre_juego = "Tetris Clásico"
+
+version = "1.0"
+
+
+# Dimensiones del tablero
+
+ancho = 15
+alto = 25
+borde = "pared solida"
+
+# Velocidad de caída por segundo en la que incian cayendo los fragmentos
+
+energia_descendente = 0.5
+
+
+# ==================================
+# REGLAS DEL TETRIS
+# ==================================
+
+# Reglas para la alineación perfecta
+
+regla_puntuacion_alineacion_perfecta = {
+
+	causa = alineacion_perfecta
+	efecto = desintegracion_perfecta
+	puntos_espaciales = 105
+}
+
+# Regla para el meteorito
+regla_meteorito = {
+	fragmento = meteorito
+	color = "negro ardiente"
+	fuerza_explosion = 3
+	tiempo_explosion_seg = 6
+}
+
+# Regla para la invocación espacial de fragmentos
+regla_invocacion_espacial_fragmentos = {
+	caos_cuantico_aleatorio = "si"
+	probabilidad_fragmento_asteroide = 0.08
+}
+
+# Regla para el aumento energía descendente con los niveles
+regla_niveles_energia_descendente = {
+	aumento_energia_descendente = "si"
+	gemas_por_nivel = 500
+	velocidad_expancion = 1.5
+}
+
+# Regla GAMEOVER
+
+# el juego termina cuando en el tablero ya no caben mas asteroides o se ha llegado a un total de 10.000 Gemas
+regla_gameover = {
+	condición = "energia_colapsada"
+}
+
+# ==================================
+# NAVEGACION ESPACIAL
+# ==================================
+# Accion estelar = cada comando del jugador vinculado a una tecla
+
+controles = {
+	# Movimiento horizontal del asteroide
+	desplazar_izq   = "1"
+	desplazar_der   = "3"
+	
+	# Control de caida del asteroide
+	descenso_asteroide = "2"
+	impulso_asteroide = "5"
+
+	# Controles de estado del Tetris
+	nave_en_descanso = "4"
+	fin_nave = "0"
+	activar_poder = "6"
+}
+
+# ==================================
+# FRAGMENTOS COSMICOS
+# ==================================
+# (Las definiciones de los fragmentos saltelite, cubo, Triangulo, Asteroide, Galaxia, Serpiente, rayo y la bomba se mantienen igual)
+# ... [fragmentos] ...
+fragmento_satelite = {
+    color = "blanco"
+    variantes = [
+        # Rotacion 0 y 180 (horizontal)
+        [ [0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0] ],
+        # Rotacion 90 y 270 (vertical)
+        [ [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0] ]
+    ]
+}
+
+fragmento_cubo = {
+    color = "dorado"
+    variantes = [
+        # No cambia al rotar
+        [ [1, 1], [1, 1] ]
+    ]
+}
+
+fragmento_triangulo = {
+    color = "Morado"
+    variantes = [
+        # Rotacion 0
+        [ [0, 1, 0], [1, 1, 1], [0, 0, 0] ],
+        # Rotacion 90
+        [ [0, 1, 0], [0, 1, 1], [0, 1, 0] ],
+        # Rotacion 180
+        [ [0, 0, 0], [1, 1, 1], [0, 1, 0] ],
+        # Rotacion 270
+        [ [0, 1, 0], [1, 1, 0], [0, 1, 0] ]
+    ]
+}
+
+fragmento_serpiente = {
+    color = "verde_neon"
+    variantes = [
+        # Rotacion 0
+        [ [0, 1, 1], [1, 1, 0], [0, 0, 0] ],
+        # Rotacion 90
+        [ [0, 1, 0], [0, 1, 1], [0, 0, 1] ]
+    ]
+}
+
+fragmento_rayo = {
+    color = "rojo_fuego"
+    variantes = [
+        # Rotacion 0
+        [ [1, 1, 0], [0, 1, 1], [0, 0, 0] ],
+        # Rotacion 90
+        [ [0, 0, 1], [0, 1, 1], [0, 1, 0] ]
+    ]
+}
+
+# fragmento para el meteorito, que es una sola constelación.
+# Para evitar errores en la lógica de rotación, definimos una sola rotación.
+fragmento_meteorito = {
+    color = "negro_ardiente"
+    variantes = [
+        [ [1] ]
+    ]
+}
+
+# Lista de todos los fragmento que el tetris puede usar
+fragmento_galacticos = [fragmento_satelite, fragmento_cubo, fragmento_triangulo, fragmento_serpiente, fragmento_rayo, fragmento_meteorito]

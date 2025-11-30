@@ -1,0 +1,74 @@
+{
+    "nombre_juego": "Snake Clásico",
+    "version": "1.0",
+    "ancho": 20,
+    "alto": 15,
+    "borde": "pared solida",
+    "color_serpiente": "verde",
+    "longitud_inicial": 3,
+    "velocidad": 2,
+    "dirección_inicial": "derecha",
+    "restricciones_movimiento": {
+        "prohibir_opuestos": "si"
+    },
+    "comidas": [
+        {
+            "nombre": "normal",
+            "color": "rojo",
+            "puntos": 10,
+            "incremento": 1
+        },
+        {
+            "nombre": "bonus",
+            "color": "amarillo",
+            "puntos": 50,
+            "incremento": 2,
+            "duracion": 10,
+            "probabilidad": 0.1
+        },
+        {
+            "nombre": "venenosa",
+            "color": "morado",
+            "puntos": 20,
+            "incremento": 1,
+            "probabilidad": 0.05
+        }
+    ],
+    "regla_comida": {
+        "evento": "comida_consumida",
+        "accion": "aumentar_tamaño",
+        "incremento": 1
+    },
+    "regla_velocidad": {
+        "evento": "aumento_puntuacion",
+        "umbral_puntos": 500,
+        "multiplicador_velocidad": 1.1
+    },
+    "condiciones_victoria": [
+        {
+            "tipo": "longitud",
+            "valor": 20
+        },
+        {
+            "tipo": "puntuacion",
+            "valor": 1000
+        },
+        {
+            "tipo": "tiempo",
+            "valor": 300
+        }
+    ],
+    "condicion_derrota": {
+        "tipo": "colision",
+        "con": [
+            "pared",
+            "cuerpo"
+        ]
+    },
+    "controles": {
+        "mover_izquierda": "a",
+        "mover_derecha": "d",
+        "mover_arriba": "w",
+        "mover_abajo": "s"
+    }
+}

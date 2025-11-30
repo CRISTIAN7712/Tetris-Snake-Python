@@ -1,0 +1,107 @@
+% Archivo de configuración para el juego de Tetris Galáctico
+% Desarrollado por Ivan Andres Gomez y Jesus Casadiegos
+% Definido como base de conocimiento inspirado en Prolog
+
+% ==================================
+% PARAMETROS GENERALES DEL JUEGO
+% ==================================
+
+juego(nombre, 'Tetris Clásico').
+juego(version, '1.0').
+
+tablero(ancho, 15).
+tablero(alto, 25).
+tablero(borde, 'pared_solida').
+
+juego(energia_descendente_inicial, 0.5).
+
+% ==================================
+% REGLAS DEL TETRIS
+% ==================================
+
+% Reglas para la alineación perfecta
+regla(puntuacion_alineacion_perfecta, causa, 'alineacion_perfecta').
+regla(puntuacion_alineacion_perfecta, efecto, 'desintegracion_perfecta').
+regla(puntuacion_alineacion_perfecta, puntos_espaciales, 105).
+
+% Regla para el meteorito
+regla(meteorito, fragmento, 'meteorito').
+regla(meteorito, color, 'negro_ardiente').
+regla(meteorito, fuerza_explosion, 3).
+regla(meteorito, tiempo_explosion_seg, 6).
+
+% Regla para la invocación espacial de fragmentos
+regla(invocacion_espacial_fragmentos, caos_cuantico_aleatorio, si).
+regla(invocacion_espacial_fragmentos, probabilidad_fragmento_asteroide, 0.08).
+
+% Regla para el aumento de energía descendente con los niveles
+regla(niveles_energia_descendente, aumento_energia_descendente, si).
+regla(niveles_energia_descendente, gemas_por_nivel, 500).
+regla(niveles_energia_descendente, velocidad_expancion, 1.5).
+
+% Regla GAMEOVER
+regla(gameover, condicion, 'energia_colapsada').
+
+% ==================================
+% NAVEGACION ESPACIAL
+% ==================================
+% control(accion, tecla).
+
+control('desplazar_izq', '1').
+control('desplazar_der', '3').
+control('descenso_asteroide', '2').
+control('impulso_asteroide', '5').
+control('nave_en_descanso', '4').
+control('reinicio_nave', '0').
+control('activar_poder', '6').
+
+% ==================================
+% PODER ESPECIAL
+% ==================================
+% Solo puede usarse una vez cuando el jugador alcanza 1000 puntos.
+% Al activarlo (tecla 6), elimina todos los bloques del tablero y permite continuar la partida.
+
+regla(poder_especial, condicion, 'puntos_mayores_o_iguales_a_1000').
+regla(poder_especial, efecto, 'eliminar_todos_los_bloques').
+regla(poder_especial, usos_disponibles, 1).
+
+% Asociación directa entre tecla y activación del poder
+accion_tecla('6', activar_poder_especial).
+
+% ==================================
+% FRAGMENTOS CÓSMICOS
+% ==================================
+% Cada fragmento se define con su nombre, color y una lista de variantes (rotaciones)
+
+fragmento(satelite, 'blanco', [
+[[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]], % Rotación 0 y 180
+[[0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0]] % Rotación 90 y 270
+]).
+
+fragmento(cubo, 'dorado', [
+[[1, 1], [1, 1]] % No cambia al rotar
+]).
+
+fragmento(triangulo, 'morado', [
+[[0, 1, 0], [1, 1, 1], [0, 0, 0]], % Rotación 0
+[[0, 1, 0], [0, 1, 1], [0, 1, 0]], % Rotación 90
+[[0, 0, 0], [1, 1, 1], [0, 1, 0]], % Rotación 180
+[[0, 1, 0], [1, 1, 0], [0, 1, 0]] % Rotación 270
+]).
+
+fragmento(serpiente, 'verde_neon', [
+[[0, 1, 1], [1, 1, 0], [0, 0, 0]], % Rotación 0
+[[0, 1, 0], [0, 1, 1], [0, 0, 1]] % Rotación 90
+]).
+
+fragmento(rayo, 'rojo_fuego', [
+[[1, 1, 0], [0, 1, 1], [0, 0, 0]], % Rotación 0
+[[0, 0, 1], [0, 1, 1], [0, 1, 0]] % Rotación 90
+]).
+
+fragmento(meteorito, 'negro_ardiente', [
+[[1]] % Una sola rotación
+]).
+
+% Lista de todos los fragmentos galácticos
+fragmentos_disponibles([satelite, cubo, triangulo, serpiente, rayo, meteorito]).

@@ -1,0 +1,91 @@
+# Archivo de configuracion para el juego de Snake
+# Desarrollado por Jesus Casadiegos e Ivan Andres Gomez 
+
+# Parametros generales del juego
+
+nombre_juego = "Snake Clásico"
+
+version = "1.0"
+
+# Dimensiones del tablero
+
+ancho = 20
+alto = 15
+borde = "pared solida"
+
+# Configuración de la serpiente
+
+color_serpiente = "verde"
+longitud_inicial = 3
+velocidad = 2 #cuadros por segundo
+dirección_inicial = "derecha"
+
+# Restricciones de movimiento
+
+restricciones_movimiento = {
+    prohibir_opuestos = "si"
+}
+
+# Configuración de la comida
+
+comidas = [
+    {
+        nombre = "normal"
+        color = "rojo"
+        puntos = 10
+        incremento = 1
+    },
+    {
+        nombre = "bonus"
+        color = "amarillo"
+        puntos = 50
+        incremento = 2
+        duracion = 10
+        probabilidad = 0.1
+    },
+    {
+        nombre = "venenosa"
+        color = "morado"
+        puntos = -20
+        incremento = -1
+        probabilidad = 0.05
+    }
+]
+
+# Reglas del juego
+
+regla_comida = {
+    evento = "comida_consumida"
+    accion = "aumentar_tamaño"
+    incremento = 1
+}
+
+regla_velocidad = {
+    evento = "aumento_puntuacion"
+    umbral_puntos = 500
+    multiplicador_velocidad = 1.1
+}
+
+# Condiciones de victoria
+
+condiciones_victoria = [
+    { tipo = "longitud" valor = 20 },
+    { tipo = "puntuacion" valor = 1000 },
+    { tipo = "tiempo" valor = 300 }
+]
+
+# Condiciones de derrota
+
+condicion_derrota = {
+    tipo = "colision"
+    con = ["pared", "cuerpo"]
+}
+
+# Controles del juego
+
+controles = {
+    mover_izquierda = "a"
+    mover_derecha = "d"
+    mover_arriba = "w"
+    mover_abajo = "s"
+}

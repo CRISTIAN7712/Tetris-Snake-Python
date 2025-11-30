@@ -1,0 +1,281 @@
+{
+    "nombre_juego": "Tetris Clásico",
+    "version": "1.0",
+    "ancho": 15,
+    "alto": 20,
+    "borde": "pared solida",
+    "energia_descendente": 0.5,
+    "regla_puntuacion_alineacion_perfecta": {
+        "causa": "alineacion_perfecta",
+        "efecto": "desintegracion_perfecta",
+        "puntos_espaciales": 105
+    },
+    "regla_meteorito": {
+        "fragmento": "meteorito",
+        "color": "negro ardiente",
+        "fuerza_explosion": 3,
+        "tiempo_explosion_seg": 6
+    },
+    "regla_invocacion_espacial_fragmentos": {
+        "caos_cuantico_aleatorio": "si",
+        "probabilidad_fragmento_asteroide": 0.08
+    },
+    "regla_niveles_energia_descendente": {
+        "aumento_energia_descendente": "si",
+        "gemas_por_nivel": 500,
+        "velocidad_expancion": 1.5
+    },
+    "regla_gameover": {
+        "condición": "energia_colapsada"
+    },
+    "controles": {
+        "desplazar_izq": "1",
+        "desplazar_der": "3",
+        "descenso_asteroide": "2",
+        "impulso_asteroide": "5",
+        "nave_en_descanso": "4",
+        "fin_nave": "0",
+        "activar_poder": "6"
+    },
+    "fragmento_satelite": {
+        "color": "blanco",
+        "variantes": [
+            [
+                [
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                [
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    0,
+                    0,
+                    0
+                ]
+            ],
+            [
+                [
+                    0,
+                    1,
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1,
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1,
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1,
+                    0,
+                    0
+                ]
+            ]
+        ]
+    },
+    "fragmento_cubo": {
+        "color": "dorado",
+        "variantes": [
+            [
+                [
+                    1,
+                    1
+                ],
+                [
+                    1,
+                    1
+                ]
+            ]
+        ]
+    },
+    "fragmento_triangulo": {
+        "color": "Morado",
+        "variantes": [
+            [
+                [
+                    0,
+                    1,
+                    0
+                ],
+                [
+                    1,
+                    1,
+                    1
+                ],
+                [
+                    0,
+                    0,
+                    0
+                ]
+            ],
+            [
+                [
+                    0,
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    1,
+                    1
+                ],
+                [
+                    0,
+                    1,
+                    0
+                ]
+            ],
+            [
+                [
+                    0,
+                    0,
+                    0
+                ],
+                [
+                    1,
+                    1,
+                    1
+                ],
+                [
+                    0,
+                    1,
+                    0
+                ]
+            ],
+            [
+                [
+                    0,
+                    1,
+                    0
+                ],
+                [
+                    1,
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    1,
+                    0
+                ]
+            ]
+        ]
+    },
+    "fragmento_serpiente": {
+        "color": "verde_neon",
+        "variantes": [
+            [
+                [
+                    0,
+                    1,
+                    1
+                ],
+                [
+                    1,
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    0,
+                    0
+                ]
+            ],
+            [
+                [
+                    0,
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    1,
+                    1
+                ],
+                [
+                    0,
+                    0,
+                    1
+                ]
+            ]
+        ]
+    },
+    "fragmento_rayo": {
+        "color": "rojo_fuego",
+        "variantes": [
+            [
+                [
+                    1,
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    1,
+                    1
+                ],
+                [
+                    0,
+                    0,
+                    0
+                ]
+            ],
+            [
+                [
+                    0,
+                    0,
+                    1
+                ],
+                [
+                    0,
+                    1,
+                    1
+                ],
+                [
+                    0,
+                    1,
+                    0
+                ]
+            ]
+        ]
+    },
+    "fragmento_meteorito": {
+        "color": "negro_ardiente",
+        "variantes": [
+            [
+                [
+                    1
+                ]
+            ]
+        ]
+    },
+    "fragmento_galacticos": [
+        "fragmento_satelite",
+        "fragmento_cubo",
+        "fragmento_triangulo",
+        "fragmento_serpiente",
+        "fragmento_rayo",
+        "fragmento_meteorito"
+    ]
+}
