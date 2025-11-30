@@ -1,4 +1,3 @@
-# master_game_gui_b.py
 import tkinter as tk
 from tkinter import messagebox
 import random
@@ -6,7 +5,6 @@ import time
 import sys
 import os
 
-# Sonido opcional: pygame si está disponible
 try:
     import pygame
     pygame.mixer.init()
@@ -15,28 +13,17 @@ except Exception:
     PYGAME = False
 
 class MasterGame:
-    """
-    MasterGame: una sola clase que contiene:
-    - GUI (Tkinter) con selección de juego.
-    - Tetris gráfico en canvas.
-    - Snake gráfico en canvas.
-    - Ambos juegos dibujados y controlados por teclado.
-    """
-
     def __init__(self, width=800, height=600):
-        # --- GUI base ---
         self.root = tk.Tk()
         self.root.title("MasterGame — Tetris + Snake (Gráfico)")
         self.root.protocol("WM_DELETE_WINDOW", self._on_quit)
 
-        # Maximizar ventana (Windows + Linux)
         self.root.state("zoomed")
         try:
             self.root.attributes("-zoomed", True)
         except:
             pass
 
-        # sonido opcional
         self.snd_tetris = None
         self.snd_snake = None
         if PYGAME:
@@ -49,8 +36,7 @@ class MasterGame:
                 self.snd_tetris = None
                 self.snd_snake = None
 
-        # estado del juego
-        self.mode = None  # "tetris" or "snake" or None
+        self.mode = None  
         self.running = False
 
         # ---------------------------
@@ -117,9 +103,6 @@ class MasterGame:
         # mostrar menú inicial
         self._show_menu_info()
 
-
-        # Start mainloop if used as script; else call start()
-    # end __init__
     # ---------------------------
     # Generic helpers and UI
     # ---------------------------
