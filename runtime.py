@@ -41,10 +41,10 @@ class MasterGame:
         self.snd_snake = None
         if PYGAME:
             try:
-                if os.path.exists("click.wav"):
-                    self.snd_tetris = pygame.mixer.Sound("click.wav")
-                if os.path.exists("eat.wav"):
-                    self.snd_snake = pygame.mixer.Sound("eat.wav")
+                if os.path.exists("keyboard.wav"):
+                    self.snd_tetris = pygame.mixer.Sound("keyboard.wav")
+                if os.path.exists("eating.wav"):
+                    self.snd_snake = pygame.mixer.Sound("eating.wav")
             except Exception:
                 self.snd_tetris = None
                 self.snd_snake = None
@@ -644,7 +644,6 @@ class MasterGame:
         self._after_id = self.canvas.after(self.s_speed, self._snake_step)
 
     def _snake_handle_key(self, keysym, char):
-        # map WASD and arrows to directions
         key = char.lower() if char else keysym
         if key in ("w","Up","W","Up"):
             if self.s_dir!=(0,1):
@@ -660,6 +659,12 @@ class MasterGame:
                 self.s_dir=(1,0)
         elif key in ("q","Q"):
             self.stop_game()
+
+        try:
+            if self.snd_tetris:
+                self.snd_tetris.play()
+        except Exception:
+            pass
 
 # ============================
 # Ejecutar la app
