@@ -76,6 +76,10 @@ class MasterGame:
         self.canvas = tk.Canvas(self.canvas_frame, bg="black")
         self.canvas.grid(row=0, column=0, sticky="nsew")
 
+        # dimensiones base de ventana
+        self.WIN_W = width
+        self.WIN_H = height
+
         # redibujar al cambiar tamaño (responsive)
         self.canvas.bind("<Configure>", self._on_resize)
 
@@ -127,10 +131,24 @@ class MasterGame:
             "Nota: ambos juegos son gráficos (canvas)."
         ))
         self.canvas.delete("all")
-        # draw a simple title
-        w = self.canvas.winfo_width() or self.WIN_W - self.left_w - 20
-        h = self.canvas.winfo_height() or self.WIN_H - 20
-        self.canvas.create_text(w//2, h//2, text="MasterGame\nTetris & Snake", fill="white", font=("Arial", 30), justify="center")
+
+        # Medidas del canvas (con fallback si aún no se ha dibujado)
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+
+        if cw < 50:
+            cw = self.WIN_W - self.left_w - 20
+        if ch < 50:
+            ch = self.WIN_H - 20
+
+        # Título
+        self.canvas.create_text(
+            cw // 2, ch // 2,
+            text="MasterGame\nTetris & Snake",
+            fill="white",
+            font=("Arial", 30),
+            justify="center"
+        )
 
     def _on_resize(self, event):
         """Se ejecuta cada vez que el canvas cambia de tamaño."""
@@ -429,7 +447,7 @@ class MasterGame:
                 self.t_piece_x += 1
         elif key == "4":
             if not self.running:
-                return  # evita bug si ya está pausado
+                return
 
             self.running = False
             if self._after_id:
@@ -438,15 +456,19 @@ class MasterGame:
                 except:
                     pass
 
-            # texto de pausa
-            self.canvas.create_text(
-                self.WIN_W//2, 35,
+            # obtener tamaño REAL del canvas
+            cw = self.canvas.winfo_width()
+            ch = self.canvas.winfo_height()
+
+            # mensaje de pausa
+            self.pause_msg = self.canvas.create_text(
+                cw//2, 50,
                 text="PAUSA (7 seg)",
                 fill="yellow",
-                font=("Arial", 20)
+                font=("Arial", 24, "bold")
             )
-            self.canvas.update()
 
+            self.canvas.update()
             self.canvas.after(7000, self._resume_after_pause)
             return
         elif key=="5":
@@ -455,20 +477,53 @@ class MasterGame:
                 self.t_piece_y += 1
             self._tetris_lock_piece()
         elif key == "6":
-            # POWER: limpiar tablero si puntaje >= 1000 y no usado
+            # POWER ok
             if self.t_score >= 1000 and not self.t_power_used:
+
                 for y in range(self.t_height):
                     for x in range(self.t_width):
                         self.t_board[y][x] = 0
+
                 self.t_power_used = True
-            else:
-                # retroalimentación: parpadeo rápido del fondo
-                self.canvas.create_rectangle(
-                    0, 0, self.WIN_W, self.WIN_H,
-                    fill="#550000"
+
+                cw = self.canvas.winfo_width()
+                ch = self.canvas.winfo_height()
+
+                msg = self.canvas.create_text(
+                    cw//2, ch//2,
+                    text="POWER ACTIVADO",
+                    fill="yellow",
+                    font=("Arial", 26, "bold")
                 )
                 self.canvas.update()
+                self.canvas.after(900)
+                self.canvas.delete(msg)
+
+            else:
+                # falla del power: puntaje insuficiente o ya usado
+                cw = self.canvas.winfo_width()
+                ch = self.canvas.winfo_height()
+
+                if self.t_power_used:
+                    texto = "El POWER ya fue usado"
+                else:
+                    texto = "Necesitas 1000 puntos"
+
+                # parpadeo rojo
+                self.canvas.create_rectangle(0,0,cw,ch, fill="#550000")
+                self.canvas.update()
                 self.canvas.after(60)
+
+                # mensaje de error
+                msg = self.canvas.create_text(
+                    cw//2, ch//2,
+                    text=texto,
+                    fill="red",
+                    font=("Arial", 24, "bold")
+                )
+                self.canvas.update()
+                self.canvas.after(900)
+                self.canvas.delete(msg)
         elif key == "7":
             # Rotación con validación de bordes
             newp = self._rotate_matrix(self.t_piece)
@@ -492,10 +547,12 @@ class MasterGame:
         # redraw
         self._draw_tetris()
     def _resume_after_pause(self):
-        if not self.running:
-            self.running = True
-        self._tetris_schedule()
+        # borrar texto si existe
+        if hasattr(self, "pause_msg"):
+            self.canvas.delete(self.pause_msg)
 
+        self.running = True
+        self._tetris_schedule()
     # =========================
     #  SNAKE implementation
     # =========================
