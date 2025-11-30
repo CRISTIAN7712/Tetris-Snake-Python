@@ -1,539 +1,500 @@
-# master_game.py
-import os
-import sys
-import time
+# master_game_gui_b.py
+import tkinter as tk
+from tkinter import messagebox
 import random
-import json
+import time
+import sys
+import os
 
-# colorama para colores en consola
-from colorama import init as colorama_init, Fore, Style
-colorama_init()
-
-# intento de inicializar sonido con pygame; si falla, sigue sin sonido
+# Sonido opcional: pygame si está disponible
 try:
     import pygame
     pygame.mixer.init()
-    PYGAME_AVAILABLE = True
+    PYGAME = True
 except Exception:
-    PYGAME_AVAILABLE = False
+    PYGAME = False
 
 class MasterGame:
     """
-    Clase única que contiene TODO: menú, Tetris (completo) y Snake (completo).
-    Mantiene la lógica original lo más fiel posible.
+    MasterGame: una sola clase que contiene:
+    - GUI (Tkinter) con selección de juego.
+    - Tetris gráfico en canvas.
+    - Snake gráfico en canvas.
+    - Ambos juegos dibujados y controlados por teclado.
     """
 
-    def __init__(self):
-        # Rutas de sonido (opcionales)
-        self.sonido_tetris_path = "click.wav"
-        self.sonido_snake_path = "eat.wav"
-        self.sonido_tetris = None
-        self.sonido_snake = None
-        if PYGAME_AVAILABLE:
+    def __init__(self, width=800, height=600):
+        # --- GUI base ---
+        self.root = tk.Tk()
+        self.root.title("MasterGame — Tetris + Snake (Gráfico)")
+        self.root.protocol("WM_DELETE_WINDOW", self._on_quit)
+
+        # ventana tamaño
+        self.WIN_W = width
+        self.WIN_H = height
+        self.root.geometry(f"{self.WIN_W}x{self.WIN_H}")
+
+        # sonido opcional
+        self.snd_tetris = None
+        self.snd_snake = None
+        if PYGAME:
             try:
-                if os.path.exists(self.sonido_tetris_path):
-                    self.sonido_tetris = pygame.mixer.Sound(self.sonido_tetris_path)
-                if os.path.exists(self.sonido_snake_path):
-                    self.sonido_snake = pygame.mixer.Sound(self.sonido_snake_path)
+                if os.path.exists("click.wav"):
+                    self.snd_tetris = pygame.mixer.Sound("click.wav")
+                if os.path.exists("eat.wav"):
+                    self.snd_snake = pygame.mixer.Sound("eat.wav")
             except Exception:
-                self.sonido_tetris = None
-                self.sonido_snake = None
+                self.snd_tetris = None
+                self.snd_snake = None
 
-        # Detectar plataforma y establecer lectura de teclas (función)
-        self._setup_leer_tecla()
+        # estado del juego
+        self.mode = None  # "tetris" or "snake" or None
+        self.running = False
 
-        # Variables auxiliares
-        self._stop_requested = False
+        # --- Layout: left control panel, right canvas area ---
+        self.left_w = 200
+        self.left_frame = tk.Frame(self.root, width=self.left_w)
+        self.left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=6, pady=6)
 
-    # -----------------------------
-    #  Detección de teclas (configurada en init)
-    # -----------------------------
-    def _setup_leer_tecla(self):
-        # Definimos self.leer_tecla() para Windows o Unix
+        self.canvas_frame = tk.Frame(self.root)
+        self.canvas_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=6, pady=6)
+
+        # Controls
+        tk.Label(self.left_frame, text="MasterGame", font=("Arial", 16, "bold")).pack(pady=(6,12))
+        tk.Button(self.left_frame, text="Jugar Tetris", width=18, command=self.start_tetris).pack(pady=4)
+        tk.Button(self.left_frame, text="Jugar Snake", width=18, command=self.start_snake).pack(pady=4)
+        tk.Button(self.left_frame, text="Parar / Volver al menú", width=18, command=self.stop_game).pack(pady=8)
+        tk.Button(self.left_frame, text="Salir", width=18, command=self._on_quit).pack(pady=8)
+
+        tk.Label(self.left_frame, text="Info / Controles", font=("Arial", 10, "bold")).pack(pady=(12,4))
+        self.info_label = tk.Label(self.left_frame, text="", justify=tk.LEFT, wraplength=self.left_w-10)
+        self.info_label.pack()
+
+        # Canvas
+        self.canvas = tk.Canvas(self.canvas_frame, bg="black")
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+
+        # bind keys
+        self.root.bind_all("<Key>", self._on_key)
+
+        # clock
+        self._after_id = None
+
+        # Tetris & Snake configuration placeholders (set when starting)
+        # --- TETRIS parameters (grid cells) ---
+        self.t_width = 10
+        self.t_height = 20
+        self.cell = 24  # px per cell
+        # margin to center the tetris board
+        self.t_margin_x = 20
+        self.t_margin_y = 20
+
+        # --- SNAKE parameters ---
+        self.s_cols = 30
+        self.s_rows = 20
+        self.s_cell = 20
+
+        # initialize drawing
+        self._show_menu_info()
+
+        # Start mainloop if used as script; else call start()
+    # end __init__
+    # ---------------------------
+    # Generic helpers and UI
+    # ---------------------------
+    def _show_menu_info(self):
+        self.info_label.config(text=(
+            "Selecciona un juego:\n\n"
+            "Tetris: controles numéricos 1=Left 2=Down 3=Right 4=Pause 5=Drop 6=Power 7=Rotate\n"
+            "Snake: WASD o flechas, Q para salir\n\n"
+            "Nota: ambos juegos son gráficos (canvas)."
+        ))
+        self.canvas.delete("all")
+        # draw a simple title
+        w = self.canvas.winfo_width() or self.WIN_W - self.left_w - 20
+        h = self.canvas.winfo_height() or self.WIN_H - 20
+        self.canvas.create_text(w//2, h//2, text="MasterGame\nTetris & Snake", fill="white", font=("Arial", 30), justify="center")
+
+    def _on_quit(self):
+        self.stop_game()
         try:
-            import msvcrt
-            def leer_tecla_windows():
-                if msvcrt.kbhit():
-                    try:
-                        return msvcrt.getch().decode("latin-1")
-                    except:
-                        return None
-                return None
-            self.leer_tecla = leer_tecla_windows
-            self._msvcrt = msvcrt
-            self._use_msvcrt = True
-        except ImportError:
-            # Unix-like
-            import termios, tty, select
-            def leer_tecla_unix():
-                dr, dw, de = select.select([sys.stdin], [], [], 0)
-                if dr:
-                    return sys.stdin.read(1)
-                return None
-            self.leer_tecla = leer_tecla_unix
-            self._use_msvcrt = False
+            if PYGAME:
+                pygame.mixer.quit()
+        except Exception:
+            pass
+        self.root.destroy()
+        try:
+            sys.exit(0)
+        except Exception:
+            pass
 
-    # =============================
-    #  Motor de juego general (leer config y seleccionar juego)
-    # =============================
-    def run_runtime_from_config(self, config_file):
-        if not os.path.exists(config_file):
-            print(f"No se encontró el archivo: {config_file}")
-            sys.exit(1)
+    def _on_key(self, event):
+        k = event.keysym
+        ch = event.char
+        # pass to active mode handler
+        if self.mode == "tetris":
+            self._tetris_handle_key(k, ch)
+        elif self.mode == "snake":
+            self._snake_handle_key(k, ch)
 
-        with open(config_file, "r", encoding="utf-8") as f:
-            config = json.load(f)
+    def start(self):
+        self.root.mainloop()
 
-        nombre = config.get("nombre_juego", "").lower()
+    # ---------------------------
+    # Stop game / return to menu
+    # ---------------------------
+    def stop_game(self):
+        if self.running:
+            self.running = False
+            # cancel after
+            if self._after_id:
+                try:
+                    self.canvas.after_cancel(self._after_id)
+                except Exception:
+                    pass
+                self._after_id = None
+            self.mode = None
+            self._show_menu_info()
+    # =========================
+    #  TETRIS implementation
+    # =========================
+    def start_tetris(self):
+        if self.running:
+            messagebox.showinfo("En ejecución", "Ya hay un juego en ejecución. Deténlo primero.")
+            return
+        self.mode = "tetris"
+        self.running = True
+        # board size
+        cfg_w = 10
+        cfg_h = 20
+        self.t_width = cfg_w
+        self.t_height = cfg_h
+        self.cell = 24
+        # compute margins to center board
+        canvas_w = max(self.canvas.winfo_width(), (self.t_width*self.cell)+40)
+        canvas_h = max(self.canvas.winfo_height(), (self.t_height*self.cell)+40)
+        self.t_margin_x = (canvas_w - (self.t_width*self.cell))//2
+        self.t_margin_y = (canvas_h - (self.t_height*self.cell))//2
+        # init tetris state
+        self.t_board = [[0 for _ in range(self.t_width)] for _ in range(self.t_height)]
+        self.t_score = 0
+        self.t_power_used = False
+        self.t_speed = 500  # ms per fall step
+        # pieces (tetrominoes) as matrix of 1/0
+        self.t_pieces = [
+            ([[1,1],
+              [1,1]], "yellow"),  # O
+            ([[1,1,1,1]], "cyan"),  # I
+            ([[0,1,1],
+              [1,1,0]], "green"),  # S
+            ([[1,1,0],
+              [0,1,1]], "red"),    # Z
+            ([[1,0,0],
+              [1,1,1]], "orange"), # L
+            ([[0,0,1],
+              [1,1,1]], "blue"),   # J
+            ([[0,1,0],
+              [1,1,1]], "magenta") # T
+        ]
+        self._spawn_t_piece()
+        self._draw_tetris()
+        # set info text
+        self.info_label.config(text=f"Tetris — Puntaje: {self.t_score}")
+        # schedule step
+        self._tetris_schedule()
 
-        if "tetris" in nombre:
-            juego = self.TetrisGame(self, config)
-        elif "snake" in nombre:
-            juego = self.SnakeGame(self, config)
+    def _spawn_t_piece(self):
+        self.t_piece, self.t_piece_color = random.choice(self.t_pieces)
+        # copy matrix
+        self.t_piece = [list(row) for row in self.t_piece]
+        self.t_piece_y = 0
+        self.t_piece_x = random.randint(0, self.t_width - len(self.t_piece[0]))
+        # ensure fit
+        if self._tetris_collides(self.t_piece_x, self.t_piece_y, self.t_piece):
+            # immediate game over
+            self._tetris_game_over()
+    def _rotate_matrix(self, m):
+        return [list(row) for row in zip(*m[::-1])]
+
+    def _tetris_collides(self, nx, ny, piece):
+        for py, row in enumerate(piece):
+            for px, val in enumerate(row):
+                if val:
+                    x = nx+px
+                    y = ny+py
+                    if x < 0 or x >= self.t_width or y < 0 or y >= self.t_height:
+                        return True
+                    if self.t_board[y][x]:
+                        return True
+        return False
+
+    def _tetris_lock_piece(self):
+        for py, row in enumerate(self.t_piece):
+            for px, val in enumerate(row):
+                if val:
+                    x = self.t_piece_x+px
+                    y = self.t_piece_y+py
+                    if 0 <= y < self.t_height and 0 <= x < self.t_width:
+                        self.t_board[y][x] = self.t_piece_color
+        self._tetris_clear_lines()
+        self.t_score += 50
+        self._spawn_t_piece()
+
+    def _tetris_clear_lines(self):
+        new_board = [row for row in self.t_board if any(cell==0 for cell in row)]
+        removed = self.t_height - len(new_board)
+        for _ in range(removed):
+            new_board.insert(0, [0]*self.t_width)
+        if removed>0:
+            self.t_board = new_board
+            self.t_score += removed*100
+
+    def _tetris_game_over(self):
+        self.running = False
+        self.mode = None
+        self.canvas.create_text(self.WIN_W//2, 30, text="GAME OVER", fill="white", font=("Arial", 24))
+        messagebox.showinfo("Game Over", f"Tetris terminó. Puntaje: {self.t_score}")
+
+    def _draw_tetris(self):
+        self.canvas.delete("all")
+        # draw board background
+        bw = self.t_width*self.cell
+        bh = self.t_height*self.cell
+        x0 = self.t_margin_x
+        y0 = self.t_margin_y
+        # background rect
+        self.canvas.create_rectangle(x0-2,y0-2,x0+bw+2,y0+bh+2,fill="#111",outline="#333")
+        # draw locked blocks
+        for y in range(self.t_height):
+            for x in range(self.t_width):
+                cell = self.t_board[y][x]
+                if cell:
+                    self._draw_cell(x0 + x*self.cell, y0 + y*self.cell, self.cell, cell)
+        # draw active piece
+        for py, row in enumerate(self.t_piece):
+            for px, val in enumerate(row):
+                if val:
+                    cx = x0 + (self.t_piece_x+px)*self.cell
+                    cy = y0 + (self.t_piece_y+py)*self.cell
+                    self._draw_cell(cx, cy, self.cell, self.t_piece_color)
+        # grid lines (subtle)
+        for i in range(self.t_width+1):
+            self.canvas.create_line(x0+i*self.cell, y0, x0+i*self.cell, y0+bh, fill="#222")
+        for j in range(self.t_height+1):
+            self.canvas.create_line(x0, y0+j*self.cell, x0+bw, y0+j*self.cell, fill="#222")
+        # score
+        self.canvas.create_text(x0 + bw + 80, y0 + 20, text=f"Puntaje: {self.t_score}", fill="white", font=("Arial",12), anchor="w")
+
+    def _draw_cell(self, x, y, s, color_name):
+        # map color names to hex
+        cmap = {
+            "yellow":"#FFD54A","cyan":"#4DD0E1","green":"#AED581",
+            "red":"#EF5350","orange":"#FF8A65","blue":"#42A5F5","magenta":"#CE93D8"
+        }
+        c = cmap.get(color_name, "#FFFFFF")
+        self.canvas.create_rectangle(x+1,y+1,x+s-1,y+s-1,fill=c,outline="#111")
+
+    def _tetris_step(self):
+        if not (self.running and self.mode=="tetris"):
+            return
+        # try move down
+        if not self._tetris_collides(self.t_piece_x, self.t_piece_y+1, self.t_piece):
+            self.t_piece_y += 1
         else:
-            print("No se reconoce el tipo de juego en la configuración.")
-            sys.exit(1)
+            # cannot move down -> lock
+            self._tetris_lock_piece()
+        # redraw
+        self._draw_tetris()
+        self.info_label.config(text=f"Tetris — Puntaje: {self.t_score}")
+        # schedule next
+        self._after_id = self.canvas.after(self.t_speed, self._tetris_step)
 
-        juego.run()
-
-    # =============================
-    #  IMPLEMENTACIÓN DEL TETRIS (como clase interna pero referenciando self.master)
-    # =============================
-    class TetrisGame:
-        def __init__(self, master, config):
-            self.master = master  # referencia a MasterGame
-            self.config = config
-            self.ancho = config.get("ancho", 8)
-            self.alto = config.get("alto", 12)
-            self.velocidad = config.get("velocidad", 0.5)
-            self.puntaje = 0
-            self.poder_usado = False
-            self.juego_activo = True
-
-            # Colores disponibles para las piezas (colorama)
-            self.colores = [Fore.RED, Fore.GREEN, Fore.YELLOW, Fore.CYAN, Fore.MAGENTA, Fore.BLUE, Fore.LIGHTWHITE_EX]
-
-            # Figuras Tetris con sus colores (idénticas a tu código)
-            self.figuras = [
-                ([[ "█", "█" ],
-                  [ "█", "█" ]], Fore.YELLOW),  # O
-
-                ([[ "█" ],
-                  [ "█" ],
-                  [ "█" ],
-                  [ "█" ]], Fore.CYAN),  # I
-
-                ([[ " ", "█" ],
-                  [ "█", "█" ],
-                  [ "█", " " ]], Fore.GREEN),  # S
-
-                ([[ "█", " " ],
-                  [ "█", "█" ],
-                  [ " ", "█" ]], Fore.RED),  # Z
-
-                ([[ "█", " " ],
-                  [ "█", " " ],
-                  [ "█", "█" ]], Fore.MAGENTA),  # L
-
-                ([[ " ", "█" ],
-                  [ " ", "█" ],
-                  [ "█", "█" ]], Fore.BLUE),  # J
-
-                ([[ " ", "█", " " ],
-                  [ "█", "█", "█" ]], Fore.LIGHTWHITE_EX)  # T
-            ]
-
-            # Tablero vacío
-            self.tablero = [[" " for _ in range(self.ancho)] for _ in range(self.alto)]
-
-            # Crear primera pieza
-            self.nueva_pieza()
-
-            # Ajustar consola
-            if os.name == "nt":
-                try:
-                    os.system("mode con: cols=80 lines=25")
-                except Exception:
-                    pass
-
-        # ------------------------------
-        def nueva_pieza(self):
-            figura, color = random.choice(self.figuras)
-            self.pieza = figura
-            self.color_pieza = color
-            self.pieza_y = 0
-            self.pieza_x = random.randint(0, self.ancho - len(self.pieza[0]))
-
-        # ------------------------------
-        def mostrar_tablero(self):
-            os.system("cls" if os.name == "nt" else "clear")
-            print(Fore.CYAN + f"{self.config['nombre_juego']} | Puntaje: {self.puntaje}")
-            print(Fore.CYAN + "╔" + "═" * (self.ancho * 2) + "╗")
-            for y in range(self.alto):
-                fila = ""
-                for x in range(self.ancho):
-                    celda = self.tablero[y][x]
-                    # Dibujar pieza actual
-                    dentro = False
-                    for fy, f_row in enumerate(self.pieza):
-                        for fx, val in enumerate(f_row):
-                            if val == "█" and y == self.pieza_y + fy and x == self.pieza_x + fx:
-                                fila += self.color_pieza + "█" * 2
-                                dentro = True
-                                break
-                        if dentro:
-                            break
-                    else:
-                        fila += celda * 2
-                print(Fore.CYAN + "║" + fila + "║")
-            print(Fore.CYAN + "╚" + "═" * (self.ancho * 2) + "╝")
-            print(Style.RESET_ALL + "Controles: 1=Izq 2=Bajar 3=Der 4=Descanso 5=Impulso 6=Poder 7=Rotar 0=Salir")
-
-        # ------------------------------
-        def mover_pieza(self, dx, dy):
-            nuevo_x = self.pieza_x + dx
-            nuevo_y = self.pieza_y + dy
-
-            for fy, fila in enumerate(self.pieza):
-                for fx, celda in enumerate(fila):
-                    if celda == "█":
-                        x = nuevo_x + fx
-                        y = nuevo_y + fy
-                        if x < 0 or x >= self.ancho or y >= self.alto:
-                            return self.fijar_pieza()
-                        if y >= 0 and self.tablero[y][x] != " ":
-                            return self.fijar_pieza()
-
-            self.pieza_x, self.pieza_y = nuevo_x, nuevo_y
-            return True
-
-        # ------------------------------
-        def fijar_pieza(self):
-            for fy, fila in enumerate(self.pieza):
-                for fx, celda in enumerate(fila):
-                    if celda == "█":
-                        x = self.pieza_x + fx
-                        y = self.pieza_y + fy
-                        if 0 <= y < self.alto:
-                            self.tablero[y][x] = self.color_pieza + "█" + Style.RESET_ALL
-
-            self.limpiar_filas()
-
-            if any(self.tablero[0][x] != " " for x in range(self.ancho)):
-                self.mostrar_tablero()
-                print(Fore.RED + "💀 ¡Game Over! El tablero está lleno.")
-                self.juego_activo = False
-                time.sleep(2)
-                return False
-
-            self.nueva_pieza()
-            self.puntaje += 50
-            return False
-
-        # ------------------------------
-        def limpiar_filas(self):
-            nuevas = [fila for fila in self.tablero if any(c == " " for c in fila)]
-            eliminadas = self.alto - len(nuevas)
-            for _ in range(eliminadas):
-                nuevas.insert(0, [" "] * self.ancho)
-            self.tablero = nuevas
-            if eliminadas > 0:
-                print(Fore.GREEN + f"✅ {eliminadas} fila(s) eliminadas!")
-                self.puntaje += eliminadas * 100
-                time.sleep(0.5)
-
-        # ------------------------------
-        def rotar_pieza(self):
-            nueva = [list(fila) for fila in zip(*self.pieza[::-1])]
-            for fy, fila in enumerate(nueva):
-                for fx, celda in enumerate(fila):
-                    if celda == "█":
-                        x = self.pieza_x + fx
-                        y = self.pieza_y + fy
-                        if x < 0 or x >= self.ancho or y >= self.alto:
-                            return
-                        if y >= 0 and self.tablero[y][x] != " ":
-                            return
-            self.pieza = nueva
-
-        # ------------------------------
-        def activar_poder(self):
-            if self.puntaje >= 1000 and not self.poder_usado:
-                self.tablero = [[" " for _ in range(self.ancho)] for _ in range(self.alto)]
-                self.poder_usado = True
-                print(Fore.LIGHTMAGENTA_EX + "💥 ¡Poder activado! Todos los bloques fueron eliminados.")
-                time.sleep(1)
-            elif self.poder_usado:
-                print(Fore.YELLOW + "⚠️ Ya utilizaste el poder especial. Solo se puede usar una vez.")
-                time.sleep(1)
-            else:
-                print(Fore.RED + "❌ Puntaje insuficiente (mínimo 1000).")
-                time.sleep(1)
-
-        # ------------------------------
-        def run(self):
-            print(Fore.CYAN + "Iniciando Tetris... Presiona 0 para salir.")
-            time.sleep(1)
-
-            while self.juego_activo:
-                tecla = self.master.leer_tecla()
-                if tecla == "0":
-                    print(Fore.YELLOW + "Juego terminado por el usuario.")
-                    self.juego_activo = False
-                    break
-                elif tecla == "1":
-                    self.mover_pieza(-1, 0)
-                elif tecla == "2":
-                    self.mover_pieza(0, 1)
-                elif tecla == "3":
-                    self.mover_pieza(1, 0)
-                elif tecla == "4":
-                    print(Fore.LIGHTBLACK_EX + "😴 Descanso activado... pausa de 7 segundos.")
-                    time.sleep(7)
-                elif tecla == "5":
-                    while self.mover_pieza(0, 1) and self.juego_activo:
-                        pass
-                    self.mostrar_tablero()
-                    time.sleep(0.1)
-                    continue
-                elif tecla == "6":
-                    self.activar_poder()
-                elif tecla == "7":
-                    self.rotar_pieza()
-
-                # Reproducir sonido por tecla si está disponible (cada pulsación)
-                try:
-                    if tecla and self.master.sonido_tetris:
-                        self.master.sonido_tetris.play()
-                except Exception:
-                    pass
-
-                # Caída automática
-                self.mover_pieza(0, 1)
-                self.mostrar_tablero()
-                time.sleep(self.velocidad)
-
-    # =============================
-    #  IMPLEMENTACIÓN DEL SNAKE
-    # =============================
-    class SnakeGame:
-        COLOR_ROJO = "\033[91m"
-        COLOR_VERDE = "\033[92m"
-        COLOR_RESET = "\033[0m"
-
-        def __init__(self, master, config):
-            self.master = master
-            self.config = config
-            self.ancho = config.get("ancho", 40)
-            self.alto = config.get("alto", 30)
-            self.velocidad = config.get("velocidad", 5)
-            self.longitud_inicial = config.get("longitud_inicial", 3)
-            self.comidas = config.get("comidas", [])
-            self.color_serpiente = config.get("color_serpiente", "verde")
-            self.controles = config.get("controles", {
-                "mover_izquierda": "a",
-                "mover_derecha": "d",
-                "mover_arriba": "w",
-                "mover_abajo": "s"
-            })
-            # Inicial snake centrada
-            self.snake = [(self.ancho // 2, self.alto // 2)]
-            self.direccion = "derecha"
-            self.puntaje = 0
-            self.fruta = None
-
-            # Truco para habilitar colores ANSI en la consola de Windows moderna
-            os.system("")
-            self.generar_fruta()
+    def _tetris_schedule(self):
+        # start stepping
+        if self._after_id:
             try:
-                if os.name == "nt":
-                    os.system("mode con: cols=80 lines=30")
+                self.canvas.after_cancel(self._after_id)
             except Exception:
                 pass
+        self._after_id = self.canvas.after(self.t_speed, self._tetris_step)
 
-            # Si estamos en Windows, usaremos la función msvcrt específica dentro de este objeto
-            self._msvcrt = getattr(self.master, "_msvcrt", None)
-
-        # Mostrar tablero casi idéntico al original
-        def mostrar_tablero(self):
-            print("\033[H", end="")
-            print(f"{self.config.get('nombre_juego', 'Snake')} | Puntaje: {self.puntaje}")
-            print("╔" + "═" * self.ancho + "╗")
-            for y in range(self.alto):
-                fila = ""
-                for x in range(self.ancho):
-                    if (x, y) in self.snake:
-                        fila += f"{self.COLOR_VERDE}O{self.COLOR_RESET}"
-                    elif self.fruta and self.fruta["pos"] == (x, y):
-                        caracter = "+" if self.fruta["tipo"] == "bonus" else "*"
-                        fila += f"{self.COLOR_ROJO}{caracter}{self.COLOR_RESET}"
-                    else:
-                        fila += " "
-                print("║" + fila + "║")
-            print("╚" + "═" * self.ancho + "╝")
-            print("Usa W, A, S, D para moverte. Presiona Q para salir.")
-
-        # Leer tecla adaptada (usa msvcrt cuando existe para leer teclas especiales)
-        def leer_tecla(self):
-            if self._msvcrt:
-                if self._msvcrt.kbhit():
-                    tecla = self._msvcrt.getch()
-                    try:
-                        t = tecla.decode("latin-1").lower()
-                        if t in ["w", "a", "s", "d", "q"]:
-                            return t
-                    except:
-                        if tecla == b'\xe0':
-                            k = self._msvcrt.getch()
-                            if k == b'H': return "w"
-                            elif k == b'P': return "s"
-                            elif k == b'K': return "a"
-                            elif k == b'M': return "d"
+    def _tetris_handle_key(self, keysym, char):
+        # map keys to actions per original mapping
+        # original: 1=left 2=down 3=right 4=rest 5=impulso(drop) 6=power 7=rotate 0=exit
+        key = None
+        # accept numeric keypad keys and characters
+        if char and char.isdigit():
+            key = char
+        elif keysym in ("KP_1","KP_2","KP_3","KP_4","KP_5","KP_6","KP_7","KP_0"):
+            key = keysym[-1]
+        elif keysym=="Escape":
+            key = "0"
+        if not key:
+            return
+        # actions
+        if key=="0":
+            self.stop_game()
+            return
+        if key=="1":
+            if not self._tetris_collides(self.t_piece_x-1, self.t_piece_y, self.t_piece):
+                self.t_piece_x -= 1
+        elif key=="2":
+            if not self._tetris_collides(self.t_piece_x, self.t_piece_y+1, self.t_piece):
+                self.t_piece_y += 1
+        elif key=="3":
+            if not self._tetris_collides(self.t_piece_x+1, self.t_piece_y, self.t_piece):
+                self.t_piece_x += 1
+        elif key=="4":
+            # rest/pause for 7 seconds
+            self.running = False
+            self.canvas.after_cancel(self._after_id) if self._after_id else None
+            self.canvas.update()
+            self.canvas.after(7000, self._resume_after_pause)
+            return
+        elif key=="5":
+            # impulso: drop until collision
+            while not self._tetris_collides(self.t_piece_x, self.t_piece_y+1, self.t_piece):
+                self.t_piece_y += 1
+            self._tetris_lock_piece()
+        elif key=="6":
+            # power: clear board if score>=1000 and not used
+            if self.t_score>=1000 and not self.t_power_used:
+                for y in range(self.t_height):
+                    for x in range(self.t_width):
+                        self.t_board[y][x]=0
+                self.t_power_used = True
             else:
-                # usar la función global del master para unix
-                return self.master.leer_tecla()
-            return None
+                # small feedback: flash
+                pass
+        elif key=="7":
+            # rotate (try)
+            newp = self._rotate_matrix(self.t_piece)
+            if not self._tetris_collides(self.t_piece_x, self.t_piece_y, newp):
+                self.t_piece = newp
+        # play sound per key
+        try:
+            if self.snd_tetris:
+                self.snd_tetris.play()
+        except Exception:
+            pass
+        # redraw
+        self._draw_tetris()
+    def _resume_after_pause(self):
+        if not self.running:
+            self.running = True
+        self._tetris_schedule()
 
-        def actualizar_direccion(self, tecla):
-            if tecla == "w" and self.direccion != "abajo":
-                self.direccion = "arriba"
-            elif tecla == "s" and self.direccion != "arriba":
-                self.direccion = "abajo"
-            elif tecla == "a" and self.direccion != "derecha":
-                self.direccion = "izquierda"
-            elif tecla == "d" and self.direccion != "izquierda":
-                self.direccion = "derecha"
+    # =========================
+    #  SNAKE implementation
+    # =========================
+    def start_snake(self):
+        if self.running:
+            messagebox.showinfo("En ejecución", "Ya hay un juego en ejecución. Deténlo primero.")
+            return
+        self.mode = "snake"
+        self.running = True
+        # grid
+        self.s_cols = 30
+        self.s_rows = 20
+        self.s_cell = 20
+        # position canvas margin
+        canvas_w = max(self.canvas.winfo_width(), (self.s_cols*self.s_cell)+40)
+        canvas_h = max(self.canvas.winfo_height(), (self.s_rows*self.s_cell)+40)
+        self.s_margin_x = (canvas_w - (self.s_cols*self.s_cell))//2
+        self.s_margin_y = (canvas_h - (self.s_rows*self.s_cell))//2
+        # snake state
+        self.s_snake = [(self.s_cols//2, self.s_rows//2)]
+        self.s_dir = (1,0)
+        self.s_speed = 120  # ms per step
+        self.s_score = 0
+        self._place_food()
+        self._draw_snake()
+        self.info_label.config(text=f"Snake — Puntaje: {self.s_score}")
+        # schedule
+        self._after_id = self.canvas.after(self.s_speed, self._snake_step)
 
-        def mover_snake(self):
-            cabeza_x, cabeza_y = self.snake[0]
-            if self.direccion == "arriba": cabeza_y -= 1
-            elif self.direccion == "abajo": cabeza_y += 1
-            elif self.direccion == "izquierda": cabeza_x -= 1
-            elif self.direccion == "derecha": cabeza_x += 1
-
-            nueva_cabeza = (cabeza_x, cabeza_y)
-
-            if (nueva_cabeza in self.snake or
-                cabeza_x < 0 or cabeza_x >= self.ancho or
-                cabeza_y < 0 or cabeza_y >= self.alto):
-                os.system("cls")
-                print("¡Game Over!")
-                print(f"Puntaje final: {self.puntaje}")
-                time.sleep(2)
-                sys.exit(0)
-
-            self.snake.insert(0, nueva_cabeza)
-
-            # Si come la fruta
-            if self.fruta and self.fruta["pos"] == nueva_cabeza:
-                puntos = self.fruta.get("puntos", 10)
-                incremento = self.fruta.get("incremento", 1)
-                self.puntaje += puntos
-                for _ in range(abs(incremento)):
-                    # añadir copia del último segmento
-                    self.snake.append(self.snake[-1])
-                self.generar_fruta()
-
-                # Reproducir sonido de comer si está disponible
-                try:
-                    if self.master.sonido_snake:
-                        self.master.sonido_snake.play()
-                except Exception:
-                    pass
-            else:
-                self.snake.pop()
-
-        def generar_fruta(self):
-            if not self.comidas:
-                self.comidas = [{"nombre": "normal", "puntos": 10, "incremento": 1}]
-            fruta_tipo = random.choice(self.comidas)
-            while True:
-                pos = (random.randint(0, self.ancho - 1), random.randint(0, self.alto - 1))
-                if pos not in self.snake:
-                    break
-            fruta_instancia = dict(fruta_tipo)
-            fruta_instancia["tipo"] = fruta_tipo["nombre"]
-            fruta_instancia["pos"] = pos
-            self.fruta = fruta_instancia
-
-        def run(self):
-            os.system("cls")
-            print("Iniciando Snake... Presiona Q para salir.")
-            time.sleep(1)
-            while True:
-                tecla = self.leer_tecla()
-                if tecla == "q":
-                    print("Juego terminado por el usuario.")
-                    break
-                if tecla:
-                    self.actualizar_direccion(tecla)
-                self.mover_snake()
-                self.mostrar_tablero()
-                time.sleep(1 / self.velocidad)
-
-    # =============================
-    #  MENU PRINCIPAL / EJECUCIÓN
-    # =============================
-    def start(self):
-        # Menú simple en consola igual que el original pero con opción para sonar
+    def _place_food(self):
         while True:
-            os.system("cls" if os.name == "nt" else "clear")
-            print("🎮 Selecciona el juego que quieres ejecutar:")
-            print("1. Tetris")
-            print("2. Snake")
-            print("3. Salir")
-            opcion = input("Opción: ").strip()
-            if opcion == "1":
-                # buscar archivo de config por defecto
-                cfg = "config_tetris.ast"
-                if not os.path.exists(cfg):
-                    print(f"No se encontró {cfg}. Creando configuración por defecto...")
-                    default = {
-                        "nombre_juego": "Tetris",
-                        "ancho": 8,
-                        "alto": 12,
-                        "velocidad": 0.5
-                    }
-                    with open(cfg, "w", encoding="utf-8") as f:
-                        json.dump(default, f, ensure_ascii=False, indent=2)
-                    time.sleep(1)
-                # ejecutar runtime
-                try:
-                    self.run_runtime_from_config(cfg)
-                except KeyboardInterrupt:
-                    print("Interrupción por teclado. Volviendo al menú.")
-                    time.sleep(1)
-            elif opcion == "2":
-                cfg = "config_snake.ast"
-                if not os.path.exists(cfg):
-                    print(f"No se encontró {cfg}. Creando configuración por defecto...")
-                    default = {
-                        "nombre_juego": "Snake",
-                        "ancho": 40,
-                        "alto": 30,
-                        "velocidad": 5,
-                        "longitud_inicial": 3,
-                        "comidas": [{"nombre": "normal", "puntos": 10, "incremento": 1}]
-                    }
-                    with open(cfg, "w", encoding="utf-8") as f:
-                        json.dump(default, f, ensure_ascii=False, indent=2)
-                    time.sleep(1)
-                try:
-                    self.run_runtime_from_config(cfg)
-                except KeyboardInterrupt:
-                    print("Interrupción por teclado. Volviendo al menú.")
-                    time.sleep(1)
-            elif opcion == "3":
-                print("Saliendo...")
+            x = random.randint(0, self.s_cols-1)
+            y = random.randint(0, self.s_rows-1)
+            if (x,y) not in self.s_snake:
+                self.s_food = (x,y)
                 break
-            else:
-                print("Opción no válida. Intenta de nuevo.")
-                time.sleep(1)
 
+    def _draw_snake(self):
+        self.canvas.delete("all")
+        # background
+        grid_w = self.s_cols*self.s_cell
+        grid_h = self.s_rows*self.s_cell
+        x0 = self.s_margin_x
+        y0 = self.s_margin_y
+        self.canvas.create_rectangle(x0-2,y0-2,x0+grid_w+2,y0+grid_h+2,fill="#111",outline="#333")
+        # draw food
+        fx,fy = self.s_food
+        self.canvas.create_rectangle(x0+fx*self.s_cell+2, y0+fy*self.s_cell+2,
+                                     x0+(fx+1)*self.s_cell-2, y0+(fy+1)*self.s_cell-2,
+                                     fill="#ff3333", outline="#111")
+        # draw snake
+        for i,(sx,sy) in enumerate(self.s_snake):
+            color = "#66ff66" if i==0 else "#009933"
+            self.canvas.create_rectangle(x0+sx*self.s_cell+2, y0+sy*self.s_cell+2,
+                                         x0+(sx+1)*self.s_cell-2, y0+(sy+1)*self.s_cell-2,
+                                         fill=color, outline="#111")
+        # score
+        self.canvas.create_text(x0+grid_w+80, y0+20, text=f"Puntaje: {self.s_score}", fill="white", font=("Arial",12), anchor="w")
 
-# =============================
-#  EJECUCIÓN DIRECTA
-# =============================
+    def _snake_step(self):
+        if not (self.running and self.mode=="snake"):
+            return
+        # compute new head
+        hx,hy = self.s_snake[0]
+        dx,dy = self.s_dir
+        nx,ny = hx+dx, hy+dy
+        # collision
+        if nx<0 or nx>=self.s_cols or ny<0 or ny>=self.s_rows or (nx,ny) in self.s_snake:
+            # game over
+            messagebox.showinfo("Game Over", f"Snake terminó. Puntaje: {self.s_score}")
+            self.running = False
+            self.mode = None
+            self._show_menu_info()
+            return
+        # move
+        self.s_snake.insert(0,(nx,ny))
+        if (nx,ny)==self.s_food:
+            self.s_score += 10
+            self._place_food()
+            try:
+                if self.snd_snake:
+                    self.snd_snake.play()
+            except Exception:
+                pass
+        else:
+            self.s_snake.pop()
+        self._draw_snake()
+        self.info_label.config(text=f"Snake — Puntaje: {self.s_score}")
+        self._after_id = self.canvas.after(self.s_speed, self._snake_step)
+
+    def _snake_handle_key(self, keysym, char):
+        # map WASD and arrows to directions
+        key = char.lower() if char else keysym
+        if key in ("w","Up","W","Up"):
+            if self.s_dir!=(0,1):
+                self.s_dir=(0,-1)
+        elif key in ("s","Down","S","Down"):
+            if self.s_dir!=(0,-1):
+                self.s_dir=(0,1)
+        elif key in ("a","Left","A","Left"):
+            if self.s_dir!=(1,0):
+                self.s_dir=(-1,0)
+        elif key in ("d","Right","D","Right"):
+            if self.s_dir!=(-1,0):
+                self.s_dir=(1,0)
+        elif key in ("q","Q"):
+            self.stop_game()
+
+# ============================
+# Ejecutar la app
+# ============================
 if __name__ == "__main__":
-    game = MasterGame()
-    game.start()
+    app = MasterGame()
+    app.start()
