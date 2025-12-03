@@ -18,11 +18,12 @@ class MasterGame:
         self.root.title("MasterGame — Tetris + Snake (Gráfico)")
         self.root.protocol("WM_DELETE_WINDOW", self._on_quit)
 
-        self.root.state("zoomed")
         try:
-            self.root.attributes("-zoomed", True)
+            # Intenta primero el comando de Windows
+            self.root.state("zoomed")
         except:
-            pass
+            # Si falla (porque estás en Linux), usa el comando de Linux
+            self.root.attributes("-zoomed", True)
 
         self.snd_tetris = None
         self.snd_snake = None
